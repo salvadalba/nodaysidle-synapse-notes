@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+dist/
+.next/
+build/
+
+# Environment
+.env
+.env.local
+docker-compose.env
+*.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Brain
+.gemini/
+brain/
