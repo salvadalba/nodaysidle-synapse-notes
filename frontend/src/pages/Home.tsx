@@ -1,90 +1,111 @@
-import { Link } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useWorkspace } from '../contexts/WorkspaceContext'
+import { supabase } from '../lib/supabase'
+import { Card } from '../components/ui'
+import type { Note } from '../lib/database.types'
 
 export default function Home() {
-    const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+  const { workspace } = useWorkspace()
+  const [recentNotes, setRecentNotes] = useState<Note[]>([])
+  const [isRecording, setIsRecording] = useState(false)
 
-    return (
-        <div className="max-w-4xl mx-auto">
-            <div className="text-center py-12">
-                <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl sm:tracking-tight lg:text-6xl">
-                    Welcome to Synapse Notes
-                </h1>
-                <p className="mt-5 max-w-xl mx-auto text-xl text-gray-500">
-                    Your intelligent voice note-taking companion. Capture ideas, organize thoughts, and discover connections with the power of AI.
-                </p>
-                <div className="mt-10 flex justify-center gap-4">
-                    {isAuthenticated ? (
-                        <Link
-                            to="/notes"
-                            className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:text-lg md:px-10"
-                        >
-                            Go to Notes
-                        </Link>
-                    ) : (
-                        <>
-                            <Link
-                                to="/register"
-                                className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:text-lg md:px-10"
-                            >
-                                Get Started
-                            </Link>
-                            <Link
-                                to="/login"
-                                className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 md:text-lg md:px-10"
-                            >
-                                Sign In
-                            </Link>
-                        </>
-                    )}
+  useEffect(() => {
+    if (!workspace) return
+
+    const fetchRecent = async () => {
+      const { data } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('workspace_id', workspace.id)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      if (data) setRecentNotes(data)
+    }
+
+    fetchRecent()
+
+    // Subscribe to new notes
+    const channel = supabase
+      .channel('recent_notes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notes',
+          filter: `workspace_id=eq.${workspace.id}`,
+        },
+        () => fetchRecent()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [workspace])
+
+  const handleMicClick = () => {
+    setIsRecording(true)
+    navigate('/record')
+  }
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+      {/* Header */}
+      <div className="text-center mb-12">
+        <h1 className="text-3xl font-bold text-heading mb-2">Synapse</h1>
+        <p className="text-muted">Capture your thoughts</p>
+      </div>
+
+      {/* Big mic button */}
+      <button
+        onClick={handleMicClick}
+        className={isRecording ? 'btn-mic-recording' : 'btn-mic'}
+        aria-label="Start recording"
+      >
+        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+        </svg>
+      </button>
+
+      <p className="text-muted mt-6 mb-12">Tap to capture a thought</p>
+
+      {/* Recent notes */}
+      {recentNotes.length > 0 && (
+        <div className="w-full max-w-md">
+          <h2 className="text-sm font-medium text-muted mb-4">Recent</h2>
+          <div className="space-y-3">
+            {recentNotes.map((note) => (
+              <Card
+                key={note.id}
+                variant="interactive"
+                onClick={() => navigate(`/notes/${note.id}`)}
+                className="flex items-center gap-4"
+              >
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-medium truncate">{note.title}</h3>
+                  <p className="text-sm text-muted truncate">
+                    {note.transcript?.slice(0, 60) || note.content?.slice(0, 60) || 'No content'}
+                  </p>
                 </div>
-            </div>
-
-            <div className="mt-16">
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="px-4 py-5 sm:p-6">
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                                Voice Notes
-                            </dt>
-                            <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                                🎤
-                            </dd>
-                            <p className="mt-2 text-sm text-gray-500">
-                                Record voice notes with automatic transcription powered by AI
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="px-4 py-5 sm:p-6">
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                                Semantic Search
-                            </dt>
-                            <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                                🔍
-                            </dd>
-                            <p className="mt-2 text-sm text-gray-500">
-                                Find notes by meaning, not just keywords, using advanced embeddings
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="px-4 py-5 sm:p-6">
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                                Knowledge Graph
-                            </dt>
-                            <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                                🕸️
-                            </dd>
-                            <p className="mt-2 text-sm text-gray-500">
-                                Visualize connections between your notes and discover new insights
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                <span className="text-xs text-muted whitespace-nowrap">
+                  {formatDate(note.created_at)}
+                </span>
+              </Card>
+            ))}
+          </div>
         </div>
-    )
+      )}
+    </div>
+  )
 }
