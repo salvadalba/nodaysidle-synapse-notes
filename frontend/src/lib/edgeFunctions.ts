@@ -1,7 +1,5 @@
 import { supabase } from './supabase'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-
 interface TranscriptionResult {
   transcript: string
 }

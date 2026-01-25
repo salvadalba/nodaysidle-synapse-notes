@@ -19,20 +19,9 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true,
-        "baseUrl": "..",
-        "paths": {
-            "@shared/*": [
-                "shared/*",
-                "../shared/*"
-            ]
-        }
+        "types": ["vite/client"]
     },
     "include": [
         "src"
-    ],
-    "references": [
-        {
-            "path": "../shared"
-        }
     ]
 }

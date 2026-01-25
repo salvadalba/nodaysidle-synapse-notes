@@ -27,7 +27,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     const audioChunksRef = useRef<Blob[]>([]);
     const startTimeRef = useRef<number>(0);
     const pausedTimeRef = useRef<number>(0);
-    const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const warningShownRef = useRef(false);
 
     // Clean up timer on unmount

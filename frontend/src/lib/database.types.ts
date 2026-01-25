@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       workspaces: {
@@ -19,15 +19,16 @@ export interface Database {
         Insert: {
           id?: string
           name: string
-          invite_code: string
+          invite_code?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
-          invite_code?: string
+          invite_code?: string | null
           created_at?: string
         }
+        Relationships: []
       }
       workspace_members: {
         Row: {
@@ -51,6 +52,15 @@ export interface Database {
           display_name?: string
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       notes: {
         Row: {
@@ -64,7 +74,7 @@ export interface Database {
           image_url: string | null
           duration: number | null
           embedding: number[] | null
-          embedding_status: 'pending' | 'processing' | 'completed' | 'failed'
+          embedding_status: string
           created_at: string
           updated_at: string
         }
@@ -79,7 +89,7 @@ export interface Database {
           image_url?: string | null
           duration?: number | null
           embedding?: number[] | null
-          embedding_status?: 'pending' | 'processing' | 'completed' | 'failed'
+          embedding_status?: string
           created_at?: string
           updated_at?: string
         }
@@ -94,10 +104,19 @@ export interface Database {
           image_url?: string | null
           duration?: number | null
           embedding?: number[] | null
-          embedding_status?: 'pending' | 'processing' | 'completed' | 'failed'
+          embedding_status?: string
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "notes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       tags: {
         Row: {
@@ -118,6 +137,7 @@ export interface Database {
           workspace_id?: string
           created_at?: string
         }
+        Relationships: []
       }
       note_tags: {
         Row: {
@@ -132,7 +152,20 @@ export interface Database {
           note_id?: string
           tag_id?: string
         }
+        Relationships: []
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

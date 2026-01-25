@@ -93,7 +93,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const createWorkspace = async (name: string): Promise<Workspace> => {
     if (!user) throw new Error('Must be logged in')
 
-    const { data: code } = await supabase.rpc('generate_invite_code')
+    // Generate invite code locally
+    const code = `SYNAPSE-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
 
     const { data: ws, error: wsError } = await supabase
       .from('workspaces')
