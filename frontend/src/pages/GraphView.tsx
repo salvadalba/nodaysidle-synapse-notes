@@ -35,6 +35,7 @@ export default function GraphView() {
   const hoveredNodeRef = useRef<GraphNode | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const animationFrameRef = useRef<number | null>(null)
+  const tooltipTimeoutRef = useRef<number | null>(null)
 
   const navigate = useNavigate()
   const { workspace } = useWorkspace()
@@ -97,7 +98,7 @@ export default function GraphView() {
         // Hide tooltip
         if (tooltipRef.current) {
           tooltipRef.current.style.opacity = '0'
-          setTimeout(() => {
+          tooltipTimeoutRef.current = window.setTimeout(() => {
             if (tooltipRef.current && hoveredNodeRef.current === null) {
               tooltipRef.current.style.display = 'none'
             }
@@ -266,11 +267,15 @@ export default function GraphView() {
   const buildGraphFromNotes = useCallback((notes: Note[]) => {
     if (!sceneRef.current) return
 
-    // Clear existing graph
+    // Clear existing graph with proper disposal
     nodesRef.current.forEach(node => {
+      node.geometry?.dispose()
+      ;(node.material as THREE.Material)?.dispose()
       sceneRef.current?.remove(node)
     })
     edgesRef.current.forEach(edge => {
+      edge.geometry?.dispose()
+      ;(edge.material as THREE.Material)?.dispose()
       sceneRef.current?.remove(edge)
     })
     nodesRef.current = []
@@ -430,6 +435,14 @@ export default function GraphView() {
 
     if (tooltipRef.current && document.body.contains(tooltipRef.current)) {
       document.body.removeChild(tooltipRef.current)
+    }
+
+    if (rendererRef.current) {
+      rendererRef.current.dispose()
+    }
+
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current)
     }
 
     nodesRef.current = []
