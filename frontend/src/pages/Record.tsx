@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useWorkspace } from '../contexts/WorkspaceContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { processNote } from '../lib/edgeFunctions'
 import { Button } from '../components/ui'
 
 export default function Record() {
@@ -170,7 +171,14 @@ export default function Record() {
 
       if (noteError) throw noteError
 
+      // Navigate immediately for better UX
       navigate(`/notes/${note.id}`)
+
+      // Process note in background (transcription, embedding, image)
+      // Don't await - let it run in background while user views note
+      processNote(note.id, audioBlob).catch((err) => {
+        console.error('Background processing failed:', err)
+      })
     } catch (err) {
       console.error('Failed to save:', err)
     } finally {

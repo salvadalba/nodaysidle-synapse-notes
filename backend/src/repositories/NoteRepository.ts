@@ -1,10 +1,4 @@
-import pg from 'pg';
-
-const { Pool } = pg;
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-});
+import pool from '../db/pool.js';
 
 interface Note {
     id: string;
@@ -109,14 +103,17 @@ export class NoteRepository {
      */
     async updateNoteEmbedding(noteId: string, embedding: number[]): Promise<void> {
         try {
-            // Validate embedding dimensions
-            if (embedding.length !== 1536) {
-                throw new Error(`Expected 1536 dimensions, got ${embedding.length}`);
+            // Validate embedding dimensions (text-embedding-004 produces 768 dimensions)
+            if (embedding.length !== 768) {
+                throw new Error(`Expected 768 dimensions, got ${embedding.length}`);
             }
+
+            // Convert array to pgvector string format "[0.1, 0.2, ...]"
+            const vectorString = `[${embedding.join(',')}]`;
 
             await pool.query(
                 'UPDATE notes SET embedding = $1, embedding_status = $2 WHERE id = $3',
-                [embedding, 'completed', noteId]
+                [vectorString, 'completed', noteId]
             );
         } catch (error) {
             console.error('Error updating note embedding:', error);

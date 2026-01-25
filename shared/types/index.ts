@@ -12,6 +12,7 @@ export interface Note {
     content?: string;
     transcript?: string;
     audio_url?: string;
+    image_url?: string; // Generated visualization URL
     duration?: number;
     embedding_status: 'pending' | 'processing' | 'completed' | 'failed';
     created_at: Date;

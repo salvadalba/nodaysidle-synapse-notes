@@ -1,14 +1,9 @@
 import { Router, Response } from 'express';
-import pg from 'pg';
 import { AuthRequest, authenticateToken } from '../middleware/auth.js';
 import { CreateNoteDto, UpdateNoteDto, NoteWithDetails } from '../../../shared/types/index.js';
+import pool from '../db/pool.js';
 
 const router = Router();
-const { Pool } = pg;
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-});
 
 const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
@@ -347,6 +342,100 @@ router.get('/', authenticateToken, async (req: AuthRequest<{}, {}, {}, { page?: 
         });
     } catch (error) {
         console.error('Error listing notes:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/notes/graph - Get knowledge graph data
+ */
+router.get('/graph', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const user_id = req.user_id;
+        if (!user_id) {
+            res.status(401).json({ error: 'User not authenticated' });
+            return;
+        }
+
+        // Get all notes with embeddings
+        const notesResult = await pool.query(
+            `SELECT id, title, created_at
+             FROM notes
+             WHERE user_id = $1
+             ORDER BY created_at DESC`,
+            [user_id]
+        );
+
+        const notes = notesResult.rows;
+
+        // Use pgvector's native similarity queries to find related notes efficiently
+        // This replaces the O(N²) in-memory computation with database-level operations
+        const threshold = 0.5; // Similarity threshold (higher = more similar, range 0-1)
+        const maxLinksPerNote = 5; // Limit connections per note to keep graph manageable
+
+        // Query to find similar note pairs using pgvector's cosine distance operator
+        // The <=> operator returns cosine distance (0 = identical, 2 = opposite)
+        // We convert to similarity: 1 - (distance / 2) or simply 1 - distance for normalized vectors
+        const linksResult = await pool.query(
+            `WITH note_pairs AS (
+                SELECT
+                    n1.id as source_id,
+                    n2.id as target_id,
+                    1 - (n1.embedding <=> n2.embedding) as similarity
+                FROM notes n1
+                CROSS JOIN notes n2
+                WHERE n1.user_id = $1
+                    AND n2.user_id = $1
+                    AND n1.id < n2.id  -- Avoid duplicates and self-joins
+                    AND n1.embedding IS NOT NULL
+                    AND n2.embedding IS NOT NULL
+                    AND 1 - (n1.embedding <=> n2.embedding) > $2
+            ),
+            ranked_pairs AS (
+                SELECT
+                    source_id,
+                    target_id,
+                    similarity,
+                    ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY similarity DESC) as rank_source,
+                    ROW_NUMBER() OVER (PARTITION BY target_id ORDER BY similarity DESC) as rank_target
+                FROM note_pairs
+            )
+            SELECT source_id, target_id, similarity
+            FROM ranked_pairs
+            WHERE rank_source <= $3 OR rank_target <= $3
+            ORDER BY similarity DESC`,
+            [user_id, threshold, maxLinksPerNote]
+        );
+
+        const links: { source: string; target: string; value: number }[] = linksResult.rows.map(row => ({
+            source: row.source_id,
+            target: row.target_id,
+            value: row.similarity
+        }));
+
+        // Add manual links
+        const manualLinksResult = await pool.query(
+            `SELECT source_note_id, target_note_id
+             FROM manual_links
+             WHERE source_note_id IN (SELECT id FROM notes WHERE user_id = $1)`,
+            [user_id]
+        );
+
+        manualLinksResult.rows.forEach(row => {
+            links.push({
+                source: row.source_note_id,
+                target: row.target_note_id,
+                value: 1.0 // Maximum strength for manual links
+            });
+        });
+
+        res.json({
+            nodes: notes.map(n => ({ id: n.id, title: n.title, group: 1, created_at: n.created_at })),
+            links: links
+        });
+
+    } catch (error) {
+        console.error('Error fetching graph data:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

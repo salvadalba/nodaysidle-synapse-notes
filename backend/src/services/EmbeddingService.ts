@@ -1,45 +1,88 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createHash } from 'crypto';
 
-interface EmbeddingCache {
-    [key: string]: number[];
+/**
+ * Simple LRU Cache implementation for embeddings
+ */
+class LRUCache<K, V> {
+    private cache: Map<K, V>;
+    private readonly maxSize: number;
+
+    constructor(maxSize: number) {
+        this.cache = new Map();
+        this.maxSize = maxSize;
+    }
+
+    get(key: K): V | undefined {
+        const value = this.cache.get(key);
+        if (value !== undefined) {
+            // Move to end (most recently used)
+            this.cache.delete(key);
+            this.cache.set(key, value);
+        }
+        return value;
+    }
+
+    set(key: K, value: V): void {
+        // If key exists, delete it first to update position
+        if (this.cache.has(key)) {
+            this.cache.delete(key);
+        } else if (this.cache.size >= this.maxSize) {
+            // Remove least recently used (first item)
+            const firstKey = this.cache.keys().next().value;
+            if (firstKey !== undefined) {
+                this.cache.delete(firstKey);
+            }
+        }
+        this.cache.set(key, value);
+    }
+
+    has(key: K): boolean {
+        return this.cache.has(key);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+
+    get size(): number {
+        return this.cache.size;
+    }
 }
 
 export class EmbeddingService {
-    private openai: OpenAI | null = null;
-    private cache: EmbeddingCache = {};
+    private genAI: GoogleGenerativeAI | null = null;
+    private cache: LRUCache<string, number[]>;
     private readonly MAX_RETRIES = 3;
     private readonly BASE_DELAY = 1000; // 1 second
+    private readonly MAX_CACHE_SIZE = 1000; // Limit to 1000 embeddings (~6MB for 768-dim vectors)
 
     constructor() {
-        const apiKey = process.env.OPENROUTER_API_KEY;
+        // Support both env var names for flexibility
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.NANO_BANANA_API_KEY;
         if (!apiKey) {
-            console.warn('OPENROUTER_API_KEY not found in environment variables');
+            console.warn('GOOGLE_API_KEY (or NANO_BANANA_API_KEY) not found in environment variables');
         } else {
-            this.openai = new OpenAI({
-                apiKey,
-                baseURL: 'https://openrouter.ai/api/v1',
-                defaultHeaders: {
-                    'HTTP-Referer': 'https://github.com/nodaysidle/synapse-notes', // Optional, for OpenRouter tracking
-                    'X-Title': 'Synapse Notes', // Optional, for OpenRouter tracking
-                }
-            });
+            this.genAI = new GoogleGenerativeAI(apiKey);
         }
+        this.cache = new LRUCache<string, number[]>(this.MAX_CACHE_SIZE);
     }
 
     /**
-     * Generate embedding for a given text using OpenAI API
+     * Generate embedding for a given text using Google Gemini API
      * @param text - Text to generate embedding for
-     * @returns Promise<number[]> - 1536-dimension vector
+     * @returns Promise<number[]> - 768-dimension vector (standard for text-embedding-004)
      */
     async generateEmbedding(text: string): Promise<number[]> {
         // Check cache first
         const cacheKey = this.getCacheKey(text);
-        if (this.cache[cacheKey]) {
-            return this.cache[cacheKey];
+        const cached = this.cache.get(cacheKey);
+        if (cached) {
+            return cached;
         }
 
-        if (!this.openai) {
-            throw new Error('OpenAI API key not configured');
+        if (!this.genAI) {
+            throw new Error('Google Gemini API key not configured');
         }
 
         // Validate input
@@ -52,30 +95,22 @@ export class EmbeddingService {
         // Retry logic with exponential backoff
         for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
             try {
-                const response = await this.openai.embeddings.create({
-                    model: 'openai/text-embedding-3-small',
-                    input: text,
-                    dimensions: 1536,
-                });
+                const model = this.genAI.getGenerativeModel({ model: "text-embedding-004" });
 
-                const embedding = response.data[0].embedding;
-
-                // Validate embedding dimensions
-                if (embedding.length !== 1536) {
-                    throw new Error(`Expected 1536 dimensions, got ${embedding.length}`);
-                }
+                const result = await model.embedContent(text);
+                const embedding = result.embedding.values;
 
                 // Cache the result
-                this.cache[cacheKey] = embedding;
+                this.cache.set(cacheKey, embedding);
 
                 return embedding;
             } catch (error) {
                 lastError = error as Error;
-                console.error(`Embedding generation attempt ${attempt} failed:`, error);
+                console.error(`Embedding generation attempt ${attempt} failed: `, error);
 
                 // If this is the last attempt, throw the error
                 if (attempt === this.MAX_RETRIES) {
-                    throw new Error(`Failed to generate embedding after ${this.MAX_RETRIES} attempts: ${lastError.message}`);
+                    throw new Error(`Failed to generate embedding after ${this.MAX_RETRIES} attempts: ${lastError.message} `);
                 }
 
                 // Calculate delay with exponential backoff
@@ -85,24 +120,17 @@ export class EmbeddingService {
             }
         }
 
-        // This should never be reached, but TypeScript needs it
-        throw new Error(`Failed to generate embedding: ${lastError?.message || 'Unknown error'}`);
+        // This should never be reached
+        throw new Error(`Failed to generate embedding: ${lastError?.message || 'Unknown error'} `);
     }
 
     /**
-     * Generate cache key for text
+     * Generate cache key for text using SHA-256
      * @param text - Text to generate key for
-     * @returns string - Cache key
+     * @returns string - Cache key (SHA-256 hash)
      */
     private getCacheKey(text: string): string {
-        // Simple hash function for caching
-        let hash = 0;
-        for (let i = 0; i < text.length; i++) {
-            const char = text.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32bit integer
-        }
-        return hash.toString(36);
+        return createHash('sha256').update(text).digest('hex');
     }
 
     /**
@@ -118,7 +146,7 @@ export class EmbeddingService {
      * Clear the embedding cache
      */
     clearCache(): void {
-        this.cache = {};
+        this.cache.clear();
     }
 
     /**
@@ -126,7 +154,7 @@ export class EmbeddingService {
      * @returns number - Number of cached embeddings
      */
     getCacheSize(): number {
-        return Object.keys(this.cache).length;
+        return this.cache.size;
     }
 }
 

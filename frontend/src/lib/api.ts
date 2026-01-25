@@ -210,6 +210,11 @@ export const api = {
         delete: async (id: string): Promise<void> => {
             await apiClient.delete(`/notes/${id}`)
         },
+
+        graph: async (): Promise<{ nodes: Array<{ id: string; title: string; group: number; created_at: string }>; links: Array<{ source: string; target: string; value: number }> }> => {
+            const response = await apiClient.get('/notes/graph')
+            return response.data
+        },
     },
 
     audio: {

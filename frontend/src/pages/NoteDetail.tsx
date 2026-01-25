@@ -170,6 +170,24 @@ export default function NoteDetail() {
                 {formatDuration(note.duration)}
               </span>
             )}
+            {/* Processing Status */}
+            {note.embedding_status === 'pending' && (
+              <span className="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+                Queued
+              </span>
+            )}
+            {note.embedding_status === 'processing' && (
+              <span className="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse" />
+                Processing
+              </span>
+            )}
+            {note.embedding_status === 'failed' && (
+              <span className="bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full">
+                Failed
+              </span>
+            )}
           </div>
 
           {/* Content/Transcript */}
@@ -180,6 +198,18 @@ export default function NoteDetail() {
               className="w-full h-48 glass-input resize-none"
               placeholder="Note content..."
             />
+          ) : note.embedding_status === 'processing' && !note.transcript ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-cyan-400 text-sm">
+                <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                Transcribing audio...
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 bg-white/5 rounded animate-pulse" />
+                <div className="h-4 bg-white/5 rounded animate-pulse w-3/4" />
+                <div className="h-4 bg-white/5 rounded animate-pulse w-5/6" />
+              </div>
+            </div>
           ) : (
             <div className="text-slate-300 whitespace-pre-wrap">
               {note.transcript || note.content || <span className="text-muted italic">No content</span>}
@@ -215,7 +245,7 @@ export default function NoteDetail() {
         )}
 
         {/* AI Visualization */}
-        {note.image_url && (
+        {note.image_url ? (
           <Card>
             <h2 className="text-sm font-medium text-muted mb-3">AI Visualization</h2>
             <img
@@ -223,6 +253,16 @@ export default function NoteDetail() {
               alt="AI visualization"
               className="w-full rounded-xl"
             />
+          </Card>
+        ) : note.transcript && note.embedding_status !== 'failed' && (
+          <Card>
+            <h2 className="text-sm font-medium text-muted mb-3">AI Visualization</h2>
+            <div className="aspect-square bg-white/5 rounded-xl flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-muted text-sm">Generating visualization...</p>
+              </div>
+            </div>
           </Card>
         )}
       </div>

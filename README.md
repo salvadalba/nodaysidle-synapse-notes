@@ -1,83 +1,92 @@
-# 🧠 Synapse Notes
+# Synapse Notes - Deployment Guide
 
-![Synapse Notes Banner](assets/banner.png)
+A voice-first knowledge base that transforms audio notes into searchable, interconnected ideas.
 
-Synapse Notes is an **audio-first knowledge base** powered by Google Gemini (Nano Banana). It captures your thoughts at the speed of speech and automatically organizes them into a meaningful network of ideas.
+## Prerequisites
 
----
-
-## 🚀 The Vision
-
-Most note-taking apps require you to type, categorize, and tag everything manually. This creates "friction" that often stops you from capturing great ideas when they happen.
-
-**Synapse Notes flips the script.**
-
-You talk, and the AI does the heavy lifting:
-
-1. **Listen**: Captures your raw audio.
-2. **Understand**: Transcribes and summarizes your thoughts using `gemini-1.5-flash`.
-3. **Connect**: Links new notes to previous ones based on semantic meaning.
-4. **Visualize**: Shows you an interactive **Knowledge Graph** of your thoughts.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- A [Google AI Studio](https://aistudio.google.com/) API key
 
 ---
 
-## ✨ Key Features
+## Quick Start (5 minutes)
 
-### 🎙️ Effortless Recording
+### 1. Get your API Key
 
-Just click "New Note" and start speaking. Perfect for meetings, brainstorming, or capturing late-night insights without needing a keyboard.
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Click **Create API Key**
+3. Copy the key (starts with `AIza...`)
 
-### 🤖 AI Intelligence (Powered by Nano Banana)
-
-* **Automatic Transcription**: Instant conversion of voice to text.
-* **Semantic Search**: Find ideas by meaning. Search for "business growth" and find notes about marketing and strategy automatically.
-* **Auto-Linking**: The system automatically detects relationship between your notes.
-
-### 🕸️ 3D Knowledge Graph
-
-Visualize your mind. Every note is a node in a 3D space, connected by meaning and history. The more connections a note has, the larger it grows in your galaxy of ideas.
-
-### 🛡️ Local-First & Private
-
-* **Single-User Local Mode**: No complex sign-ups. Everything runs on your machine.
-* **Privacy Centric**: Your data stays local. Use your own API keys for Gemini and OpenRouter.
-
----
-
-## 🛠️ Tech Stack
-
-* **Frontend**: React, Vite, Tailwind CSS, Three.js (for the Graph)
-* **Backend**: Node.js, Express
-* **Database**: PostgreSQL with `pgvector` for semantic search
-* **AI**: Google Gemini (Transcription), OpenRouter (Embeddings)
-* **Infrastructure**: Docker & Docker Compose
-
----
-
-## 🚀 Getting Started
-
-### 1. Requirements
-
-- Docker and Docker Compose
-* Nano Banana (Google Gemini) API Key
-* OpenRouter API Key
-
-### 2. Setup
-
-1. Clone the repository.
-2. Create a `docker-compose.env` file (see `docker-compose.env.example`).
-3. Add your API keys.
-
-### 3. Run
+### 2. Configure the Environment
 
 ```bash
-docker-compose up --build -d
+# Copy the example environment file
+cp docker-compose.env.example docker-compose.env
+
+# Edit docker-compose.env and set your API key:
+# GOOGLE_API_KEY=AIza...your_key_here...
 ```
 
-Access the app at `http://localhost:5173`.
+### 3. Start the Application
+
+```bash
+docker-compose up -d
+```
+
+### 4. Open in Browser
+
+Go to **<http://localhost:5173>**
 
 ---
 
-## 📜 License
+## Using Synapse Notes
 
-MIT License. Created with ❤️ by the Synapse Team.
+### Recording a Voice Note
+
+1. Click **+ New Note**
+2. Click the **Record** button 🔴
+3. Speak your thoughts
+4. Click **Stop & Save**
+5. Click **Upload & Transcribe**
+6. Wait a few seconds → your speech appears as text!
+7. Click **Save**
+
+### Knowledge Graph
+
+- Click **Graph** in the navigation
+- See your notes as 3D nodes
+- Related notes are connected by lines
+- Click any node to view that note
+
+---
+
+## Stopping the Server
+
+```bash
+docker-compose down
+```
+
+To restart later:
+
+```bash
+docker-compose up -d
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "Transcription failed" | Check `GOOGLE_API_KEY` in `docker-compose.env` |
+| Graph won't load | Run `docker-compose build --no-cache && docker-compose up -d` |
+| Containers won't start | Make sure Docker Desktop is running |
+
+---
+
+## Tech Stack
+
+- **Frontend**: React + Three.js (3D graph)
+- **Backend**: Node.js + Express
+- **Database**: PostgreSQL with pgvector
+- **AI**: Google Gemini 2.0 Flash
