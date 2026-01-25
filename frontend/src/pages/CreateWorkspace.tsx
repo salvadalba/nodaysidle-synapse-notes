@@ -12,13 +12,13 @@ export default function CreateWorkspace() {
   const [inviteCode, setInviteCode] = useState<string | null>(null)
 
   const handleCreate = async () => {
+    setError(null)
     if (!name.trim()) {
       setError('Please enter a workspace name')
       return
     }
 
     setLoading(true)
-    setError(null)
     try {
       const workspace = await createWorkspace(name.trim())
       setInviteCode(workspace.invite_code)
@@ -59,6 +59,7 @@ export default function CreateWorkspace() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
       <button
         onClick={() => navigate('/setup')}
+        aria-label="Go back"
         className="absolute top-6 left-6 text-muted hover:text-white transition-colors"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

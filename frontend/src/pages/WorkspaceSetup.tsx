@@ -1,15 +1,17 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Card, Button } from '../components/ui'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export default function WorkspaceSetup() {
   const navigate = useNavigate()
   const { user, loading: authLoading, signInAnonymously } = useAuth()
+  const signingInRef = useRef(false)
 
   // Auto sign-in anonymously if not authenticated
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !signingInRef.current) {
+      signingInRef.current = true
       signInAnonymously()
     }
   }, [authLoading, user, signInAnonymously])

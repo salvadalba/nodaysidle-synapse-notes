@@ -12,6 +12,7 @@ export default function JoinWorkspace() {
   const [error, setError] = useState<string | null>(null)
 
   const handleJoin = async () => {
+    setError(null)
     if (!inviteCode.trim()) {
       setError('Please enter an invite code')
       return
@@ -22,7 +23,6 @@ export default function JoinWorkspace() {
     }
 
     setLoading(true)
-    setError(null)
     try {
       await joinWorkspace(inviteCode.trim(), displayName.trim())
       navigate('/')
@@ -38,6 +38,7 @@ export default function JoinWorkspace() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
       <button
         onClick={() => navigate('/setup')}
+        aria-label="Go back"
         className="absolute top-6 left-6 text-muted hover:text-white transition-colors"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
