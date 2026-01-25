@@ -1,62 +1,68 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { useWorkspace } from '../contexts/WorkspaceContext'
 
 export default function Layout() {
-    const location = useLocation()
+  const location = useLocation()
+  const { workspace } = useWorkspace()
 
-    return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white shadow-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16">
-                        <div className="flex">
-                            <div className="flex-shrink-0 flex items-center">
-                                <Link to="/" className="text-2xl font-bold text-indigo-600">
-                                    Synapse Notes
-                                </Link>
-                            </div>
-                            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                                <Link
-                                    to="/"
-                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${location.pathname === '/'
-                                        ? 'border-indigo-500 text-gray-900'
-                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                                        }`}
-                                >
-                                    Home
-                                </Link>
-                                <Link
-                                    to="/notes"
-                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${location.pathname === '/notes'
-                                        ? 'border-indigo-500 text-gray-900'
-                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                                        }`}
-                                >
-                                    Notes
-                                </Link>
-                                <Link
-                                    to="/graph"
-                                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${location.pathname === '/graph'
-                                        ? 'border-indigo-500 text-gray-900'
-                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                                        }`}
-                                >
-                                    Graph
-                                </Link>
-                            </div>
-                        </div>
-                        <div className="flex items-center">
-                            <div className="flex items-center space-x-4">
-                                <span className="text-sm text-gray-700">
-                                    Local Mode
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-            <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                <Outlet />
-            </main>
-        </div>
-    )
+  // Hide nav on workspace setup pages
+  const showNav = workspace && !location.pathname.startsWith('/setup')
+
+  return (
+    <div className="min-h-screen aurora-bg">
+      {/* Main content */}
+      <main className={`${showNav ? 'pb-24' : ''}`}>
+        <Outlet />
+      </main>
+
+      {/* Bottom navigation */}
+      {showNav && (
+        <nav className="fixed bottom-0 left-0 right-0 glass border-t border-white/10 px-6 py-4 safe-area-pb">
+          <div className="max-w-md mx-auto flex justify-around items-center">
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-1 transition-colors ${
+                  isActive ? 'text-accent' : 'text-slate-400 hover:text-white'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              <span className="text-xs font-medium">Capture</span>
+            </NavLink>
+
+            <NavLink
+              to="/notes"
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-1 transition-colors ${
+                  isActive ? 'text-accent' : 'text-slate-400 hover:text-white'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span className="text-xs font-medium">Notes</span>
+            </NavLink>
+
+            <NavLink
+              to="/graph"
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-1 transition-colors ${
+                  isActive ? 'text-accent' : 'text-slate-400 hover:text-white'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+              <span className="text-xs font-medium">Graph</span>
+            </NavLink>
+          </div>
+        </nav>
+      )}
+    </div>
+  )
 }
