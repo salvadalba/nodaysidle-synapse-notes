@@ -11,9 +11,7 @@ export default function Record() {
   const { user } = useAuth()
 
   const [isRecording, setIsRecording] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
   const [duration, setDuration] = useState(0)
-  const [transcript, setTranscript] = useState('')
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -23,14 +21,19 @@ export default function Record() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const animationRef = useRef<number | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const isRecordingRef = useRef(false)
 
   // Start recording
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
 
       // Set up audio analyser for waveform
       const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 256
@@ -55,6 +58,7 @@ export default function Record() {
 
       mediaRecorder.start()
       setIsRecording(true)
+      isRecordingRef.current = true
 
       // Start timer
       timerRef.current = window.setInterval(() => {
@@ -73,13 +77,17 @@ export default function Record() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
-      setIsPaused(false)
+      isRecordingRef.current = false
 
       if (timerRef.current) {
         clearInterval(timerRef.current)
       }
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
       }
     }
   }
@@ -97,7 +105,7 @@ export default function Record() {
     const dataArray = new Uint8Array(bufferLength)
 
     const draw = () => {
-      if (!isRecording) return
+      if (!isRecordingRef.current) return
 
       animationRef.current = requestAnimationFrame(draw)
       analyser.getByteFrequencyData(dataArray)
@@ -111,12 +119,8 @@ export default function Record() {
       for (let i = 0; i < bufferLength; i++) {
         const barHeight = (dataArray[i] / 255) * canvas.height * 0.8
 
-        // Gradient from teal to cyan
-        const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height)
-        gradient.addColorStop(0, '#14b8a6')
-        gradient.addColorStop(1, '#06b6d4')
-
-        ctx.fillStyle = gradient
+        // Teal color for waveform bars
+        ctx.fillStyle = '#14b8a6'
         ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight)
         x += barWidth + 1
       }
@@ -187,6 +191,16 @@ export default function Record() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
       if (animationRef.current) cancelAnimationFrame(animationRef.current)
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+      // Stop stream tracks if component unmounts while recording
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+      isRecordingRef.current = false
     }
   }, [])
 
@@ -204,13 +218,6 @@ export default function Record() {
         height={120}
         className="rounded-xl mb-8"
       />
-
-      {/* Transcript preview */}
-      {transcript && (
-        <div className="glass p-4 max-w-md w-full mb-8 max-h-32 overflow-y-auto">
-          <p className="text-slate-300 text-sm">{transcript}</p>
-        </div>
-      )}
 
       {/* Controls */}
       <div className="flex items-center gap-6">
