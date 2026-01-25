@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWorkspace } from '../contexts/WorkspaceContext'
 import { supabase } from '../lib/supabase'
@@ -11,27 +11,32 @@ export default function NotesList() {
   const { workspace } = useWorkspace()
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  const fetchNotes = useCallback(async () => {
+    if (!workspace) return
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('workspace_id', workspace.id)
+        .order('created_at', { ascending: false })
+
+      if (fetchError) throw fetchError
+      if (data) setNotes(data)
+    } catch (err) {
+      console.error('Failed to fetch notes:', err)
+      setError('Failed to load notes')
+    } finally {
+      setLoading(false)
+    }
+  }, [workspace])
 
   useEffect(() => {
     if (!workspace) return
-
-    const fetchNotes = async () => {
-      setLoading(true)
-      try {
-        const { data } = await supabase
-          .from('notes')
-          .select('*')
-          .eq('workspace_id', workspace.id)
-          .order('created_at', { ascending: false })
-
-        if (data) setNotes(data)
-      } catch (err) {
-        console.error('Failed to fetch notes:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
 
     fetchNotes()
 
@@ -53,17 +58,19 @@ export default function NotesList() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [workspace])
+  }, [workspace, fetchNotes])
 
   // Filter notes by search
-  const filteredNotes = searchQuery
-    ? notes.filter(
-        (n) =>
-          n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.transcript?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.content?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : notes
+  const filteredNotes = useMemo(() => {
+    if (!searchQuery) return notes
+    const query = searchQuery.toLowerCase()
+    return notes.filter(
+      (n) =>
+        n.title.toLowerCase().includes(query) ||
+        n.transcript?.toLowerCase().includes(query) ||
+        n.content?.toLowerCase().includes(query)
+    )
+  }, [notes, searchQuery])
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -101,6 +108,15 @@ export default function NotesList() {
       {loading && (
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="max-w-2xl mx-auto mb-6">
+          <Card className="bg-red-900/20 border-red-500/50">
+            <p className="text-red-400 text-sm">{error}</p>
+          </Card>
         </div>
       )}
 
