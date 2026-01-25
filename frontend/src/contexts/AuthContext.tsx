@@ -1,74 +1,63 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import type { User } from '../../../shared/types'
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { Session, User } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 
 interface AuthContextType {
-    isAuthenticated: boolean
-    user: User | null
-    loading: boolean
-    login: (email: string, password: string) => Promise<void>
-    register: (email: string, password: string) => Promise<void>
-    logout: () => void
+  user: User | null
+  session: Session | null
+  loading: boolean
+  signInAnonymously: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const [user, setUser] = useState<User | null>(null)
-    const [loading, setLoading] = useState(true)
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
 
-    // Check if user is authenticated on mount (Forced for single-user mode)
-    useEffect(() => {
-        const userData: User = {
-            id: '00000000-0000-0000-0000-000000000000',
-            email: 'user@local',
-            created_at: new Date(),
-            updated_at: new Date(),
-        }
-        setUser(userData)
-        setIsAuthenticated(true)
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session)
+        setUser(session?.user ?? null)
         setLoading(false)
-    }, [])
+      }
+    )
 
-    // Auto-refresh token (Disabled for single-user mode)
-    useEffect(() => {
-        // No-op
-    }, [isAuthenticated])
+    return () => subscription.unsubscribe()
+  }, [])
 
-    const login = useCallback(async (email: string, password: string) => {
-        // Inert for single-user mode
-        console.log('Login called in single-user mode - ignored', { email, password })
-    }, [])
+  const signInAnonymously = async () => {
+    const { error } = await supabase.auth.signInAnonymously()
+    if (error) throw error
+  }
 
-    const register = useCallback(async (email: string, password: string) => {
-        // Inert for single-user mode
-        console.log('Register called in single-user mode - ignored', { email, password })
-    }, [])
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+  }
 
-    const logout = useCallback(() => {
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('user')
-        setUser(null)
-        setIsAuthenticated(false)
-    }, [])
-
-    const value: AuthContextType = {
-        isAuthenticated,
-        user,
-        loading,
-        login,
-        register,
-        logout,
-    }
-
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, session, loading, signInAnonymously, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
-    const context = useContext(AuthContext)
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider')
-    }
-    return context
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
 }
