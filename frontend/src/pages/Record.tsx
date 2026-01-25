@@ -175,10 +175,14 @@ export default function Record() {
       navigate(`/notes/${note.id}`)
 
       // Process note in background (transcription, embedding, image)
-      // Don't await - let it run in background while user views note
-      processNote(note.id, audioBlob).catch((err) => {
-        console.error('Background processing failed:', err)
-      })
+      // Keep a reference to audioBlob before navigating
+      const blobToProcess = audioBlob
+      processNote(note.id, blobToProcess)
+        .then(() => console.log('Processing complete'))
+        .catch((err) => {
+          console.error('Background processing failed:', err)
+          alert('Transcription failed: ' + (err?.message || 'Unknown error'))
+        })
     } catch (err) {
       console.error('Failed to save:', err)
     } finally {

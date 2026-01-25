@@ -33,3 +33,4 @@ backend/uploads/*
 # Brain
 .gemini/
 brain/
+.vercel

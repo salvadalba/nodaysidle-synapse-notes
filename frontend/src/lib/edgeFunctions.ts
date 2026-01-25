@@ -57,17 +57,26 @@ export async function generateImage(prompt: string): Promise<ImageResult> {
  */
 export async function processNote(noteId: string, audioBlob: Blob): Promise<void> {
   try {
+    console.log('Processing note:', noteId, 'Blob size:', audioBlob.size, 'Type:', audioBlob.type)
+
     // Convert blob to base64
     const audioBase64 = await blobToBase64(audioBlob)
+    console.log('Audio base64 length:', audioBase64.length)
 
     // Update status to processing
-    await supabase
+    const { error: updateError } = await supabase
       .from('notes')
       .update({ embedding_status: 'processing' })
       .eq('id', noteId)
 
+    if (updateError) {
+      console.error('Failed to update status:', updateError)
+    }
+
     // Step 1: Transcribe audio
-    const { transcript } = await transcribeAudio(audioBase64, audioBlob.type)
+    console.log('Calling transcribe function...')
+    const { transcript } = await transcribeAudio(audioBase64, audioBlob.type || 'audio/webm')
+    console.log('Transcript received:', transcript?.substring(0, 100))
 
     // Update note with transcript
     await supabase
