@@ -9,20 +9,23 @@ export default function Home() {
   const navigate = useNavigate()
   const { workspace } = useWorkspace()
   const [recentNotes, setRecentNotes] = useState<Note[]>([])
-  const [isRecording, setIsRecording] = useState(false)
 
   useEffect(() => {
     if (!workspace) return
 
     const fetchRecent = async () => {
-      const { data } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('workspace_id', workspace.id)
-        .order('created_at', { ascending: false })
-        .limit(3)
+      try {
+        const { data } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('workspace_id', workspace.id)
+          .order('created_at', { ascending: false })
+          .limit(3)
 
-      if (data) setRecentNotes(data)
+        if (data) setRecentNotes(data)
+      } catch (error) {
+        console.error('Failed to fetch recent notes:', error)
+      }
     }
 
     fetchRecent()
@@ -48,7 +51,6 @@ export default function Home() {
   }, [workspace])
 
   const handleMicClick = () => {
-    setIsRecording(true)
     navigate('/record')
   }
 
@@ -70,7 +72,7 @@ export default function Home() {
       {/* Big mic button */}
       <button
         onClick={handleMicClick}
-        className={isRecording ? 'btn-mic-recording' : 'btn-mic'}
+        className="btn-mic"
         aria-label="Start recording"
       >
         <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
