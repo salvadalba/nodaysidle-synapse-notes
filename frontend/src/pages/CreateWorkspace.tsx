@@ -1,15 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWorkspace } from '../contexts/WorkspaceContext'
+import { useAuth } from '../contexts/AuthContext'
 import { Card, Button, Input } from '../components/ui'
 
 export default function CreateWorkspace() {
   const navigate = useNavigate()
   const { createWorkspace } = useWorkspace()
+  const { user, loading: authLoading, signInAnonymously } = useAuth()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [inviteCode, setInviteCode] = useState<string | null>(null)
+  const signingInRef = useRef(false)
+
+  // Ensure user is signed in
+  useEffect(() => {
+    if (!authLoading && !user && !signingInRef.current) {
+      signingInRef.current = true
+      signInAnonymously().catch((err) => {
+        console.error('Failed to sign in:', err)
+        setError('Failed to authenticate. Please refresh and try again.')
+      })
+    }
+  }, [authLoading, user, signInAnonymously])
 
   const handleCreate = async () => {
     setError(null)
@@ -18,13 +32,18 @@ export default function CreateWorkspace() {
       return
     }
 
+    if (!user) {
+      setError('Still authenticating... please wait and try again')
+      return
+    }
+
     setLoading(true)
     try {
       const workspace = await createWorkspace(name.trim())
       setInviteCode(workspace.invite_code)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create workspace:', err)
-      setError('Failed to create workspace')
+      setError(err?.message || 'Failed to create workspace')
     } finally {
       setLoading(false)
     }
@@ -32,6 +51,15 @@ export default function CreateWorkspace() {
 
   const handleContinue = () => {
     navigate('/')
+  }
+
+  // Show loading while auth is in progress
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   // Show invite code after creation
