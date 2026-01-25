@@ -15,6 +15,7 @@ export default function NoteDetail() {
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchNote = useCallback(async () => {
     if (!id) return
@@ -54,7 +55,7 @@ export default function NoteDetail() {
       }, () => fetchNote())
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { channel.unsubscribe() }
   }, [id, fetchNote])
 
   const handleSave = async () => {
@@ -77,12 +78,16 @@ export default function NoteDetail() {
   }
 
   const handleDelete = async () => {
-    if (!id || !confirm('Delete this note?')) return
+    if (!id || deleting || !confirm('Delete this note?')) return
+    setDeleting(true)
     try {
       await supabase.from('notes').delete().eq('id', id)
       navigate('/notes')
     } catch (err) {
       console.error('Failed to delete:', err)
+      setError('Failed to delete note')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -95,7 +100,7 @@ export default function NoteDetail() {
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleString('en-US', {
       month: 'long', day: 'numeric', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     })
@@ -191,7 +196,7 @@ export default function NoteDetail() {
             ) : (
               <>
                 <Button variant="secondary" onClick={() => setIsEditing(true)}>Edit</Button>
-                <Button variant="ghost" onClick={handleDelete} className="text-rose-400 hover:text-rose-300">
+                <Button variant="ghost" onClick={handleDelete} loading={deleting} className="text-rose-400 hover:text-rose-300">
                   Delete
                 </Button>
               </>
