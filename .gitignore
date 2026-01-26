@@ -20,9 +20,8 @@ firebase-debug.log*
 .DS_Store
 Thumbs.db
 
-# Backend Uploads
-backend/uploads/*
-!backend/uploads/.gitkeep
+# Supabase
+supabase/.temp/
 
 # Editor
 .vscode/
