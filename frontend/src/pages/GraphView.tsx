@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { supabase } from '../lib/supabase'
 import { useWorkspace } from '../contexts/WorkspaceContext'
 import type { Note } from '../lib/database.types'
+import { analyzeText, getSharedKeywords, calculateKeywordSimilarity, calculateMoodSimilarity } from '../utils/textAnalysis'
 
 interface GraphNode extends THREE.Mesh {
   userData: {
@@ -283,19 +284,52 @@ export default function GraphView() {
 
     if (notes.length === 0) return
 
-    // Build links based on temporal proximity (within 7 days)
-    const links: { source: string; target: string; value: number }[] = []
+    // Pre-analyze all notes for keywords and mood
+    const noteAnalysis = new Map<string, { keywords: string[]; mood: string; moodScore: number }>()
+    notes.forEach(note => {
+      // Combine title, transcript, and content for analysis
+      const text = [note.title, note.transcript, note.content].filter(Boolean).join(' ')
+      noteAnalysis.set(note.id, analyzeText(text))
+    })
+
+    // Build links based on content similarity (shared keywords & mood)
+    const links: { source: string; target: string; value: number; sharedKeywords: string[] }[] = []
+    const MIN_SHARED_KEYWORDS = 2 // Require at least 2 shared keywords to connect
+    const MIN_CONNECTION_STRENGTH = 0.1 // Minimum strength threshold
+
     for (let i = 0; i < notes.length; i++) {
       for (let j = i + 1; j < notes.length; j++) {
-        const daysDiff =
-          Math.abs(new Date(notes[i].created_at).getTime() - new Date(notes[j].created_at).getTime()) /
-          (1000 * 60 * 60 * 24)
+        const analysis1 = noteAnalysis.get(notes[i].id)!
+        const analysis2 = noteAnalysis.get(notes[j].id)!
 
-        if (daysDiff < 7) {
+        // Get shared keywords
+        const sharedKeywords = getSharedKeywords(analysis1.keywords, analysis2.keywords)
+
+        // Calculate similarity scores
+        const keywordSim = calculateKeywordSimilarity(analysis1.keywords, analysis2.keywords)
+        const moodSim = calculateMoodSimilarity(analysis1.moodScore, analysis2.moodScore)
+
+        // Check if moods are in the same category (same mood = strong connection)
+        const sameMood = analysis1.mood === analysis2.mood
+
+        // Calculate connection strength (weighted: keywords 60%, mood similarity 25%, same mood bonus 15%)
+        let connectionStrength = keywordSim * 0.6 + moodSim * 0.25
+        if (sameMood) {
+          connectionStrength += 0.15
+        }
+
+        // Connect if they share 2+ keywords OR have strong mood similarity
+        const shouldConnect =
+          sharedKeywords.length >= MIN_SHARED_KEYWORDS ||
+          (sameMood && sharedKeywords.length >= 1) ||
+          connectionStrength >= MIN_CONNECTION_STRENGTH
+
+        if (shouldConnect && connectionStrength > 0) {
           links.push({
             source: notes[i].id,
             target: notes[j].id,
-            value: 1 - daysDiff / 7, // Stronger link if closer in time
+            value: Math.min(1, connectionStrength), // Cap at 1
+            sharedKeywords,
           })
         }
       }
@@ -308,27 +342,33 @@ export default function GraphView() {
       connectionCounts.set(link.target, (connectionCounts.get(link.target) || 0) + 1)
     })
 
-    // Find date range for glow intensity
-    const dates = notes.map(n => new Date(n.created_at).getTime())
-    const minDate = Math.min(...dates)
-    const maxDate = Math.max(...dates)
+    // Color mapping for moods
+    const moodColors: Record<string, number> = {
+      happy: 0x22c55e,      // Green
+      motivated: 0xf59e0b,  // Amber
+      creative: 0xa855f7,   // Purple
+      calm: 0x14b8a6,       // Teal (default)
+      reflective: 0x6366f1, // Indigo
+      tired: 0x64748b,      // Slate
+      anxious: 0xf97316,    // Orange
+      sad: 0x3b82f6,        // Blue
+      angry: 0xef4444,      // Red
+    }
 
-    // Create node meshes with teal theme
+    // Create node meshes with mood-based colors
     const nodeMap = new Map<string, GraphNode>()
     notes.forEach(note => {
       const connectionCount = connectionCounts.get(note.id) || 0
+      const analysis = noteAnalysis.get(note.id)!
       const baseSize = 2
       const nodeSize = baseSize + connectionCount * 0.5
 
-      const noteDate = new Date(note.created_at).getTime()
-      const ageRatio = maxDate !== minDate ? (noteDate - minDate) / (maxDate - minDate) : 0.5
+      // Color based on mood
+      const moodColor = moodColors[analysis.mood] || 0x14b8a6
+      const color = new THREE.Color(moodColor)
 
-      // Teal color with slight variation based on age
-      const baseColor = new THREE.Color(0x14b8a6)
-      const accentColor = new THREE.Color(0x06b6d4)
-      const color = new THREE.Color().lerpColors(baseColor, accentColor, ageRatio)
-
-      const glowIntensity = 0.3 + ageRatio * 0.4
+      // Glow intensity based on connection count (more connections = brighter)
+      const glowIntensity = 0.3 + Math.min(connectionCount * 0.1, 0.5)
 
       const geometry = new THREE.SphereGeometry(nodeSize, 32, 32)
       const material = new THREE.MeshStandardMaterial({
@@ -360,16 +400,24 @@ export default function GraphView() {
       nodeMap.set(note.id, node)
     })
 
-    // Create edges with cyan gradient
+    // Create edges with strength-based opacity
     links.forEach(link => {
       const sourceNode = nodeMap.get(link.source)
       const targetNode = nodeMap.get(link.target)
 
       if (sourceNode && targetNode) {
+        // Stronger connections are more visible (higher opacity, brighter color)
+        const opacity = Math.min(0.8, link.value * 0.6 + 0.2)
+
+        // Color shifts from cyan (weak) to teal (strong) to green (very strong)
+        const edgeColor = link.value > 0.5
+          ? new THREE.Color(0x14b8a6) // Teal for strong
+          : new THREE.Color(0x06b6d4) // Cyan for weaker
+
         const material = new THREE.LineBasicMaterial({
-          color: 0x06b6d4, // Cyan
+          color: edgeColor,
           transparent: true,
-          opacity: Math.min(0.6, link.value * 0.8 + 0.1),
+          opacity: opacity,
         })
 
         const geometry = new THREE.BufferGeometry().setFromPoints([
@@ -575,9 +623,33 @@ export default function GraphView() {
           </div>
           <div className="flex items-center">
             <div className="w-4 h-0.5 mr-3" style={{ background: '#06b6d4' }}></div>
-            <span>Temporal connections</span>
+            <span>Shared words & mood</span>
           </div>
-          <div className="mt-4 pt-3 border-t border-white/10 space-y-1">
+
+          {/* Mood colors */}
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <p className="text-gray-500 mb-2">Node color = mood</p>
+            <div className="grid grid-cols-2 gap-1">
+              <div className="flex items-center">
+                <div className="w-2 h-2 rounded-full mr-2" style={{ background: '#22c55e' }}></div>
+                <span className="text-[10px]">Happy</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-2 h-2 rounded-full mr-2" style={{ background: '#a855f7' }}></div>
+                <span className="text-[10px]">Creative</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-2 h-2 rounded-full mr-2" style={{ background: '#6366f1' }}></div>
+                <span className="text-[10px]">Reflective</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-2 h-2 rounded-full mr-2" style={{ background: '#3b82f6' }}></div>
+                <span className="text-[10px]">Calm/Sad</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-white/10 space-y-1">
             <p className="text-gray-500">Drag to rotate</p>
             <p className="text-gray-500">Scroll to zoom</p>
             <p className="text-gray-500">Click node to view note</p>
