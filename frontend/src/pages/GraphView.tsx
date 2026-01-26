@@ -266,9 +266,6 @@ export default function GraphView() {
   }, [animate, handleClick, handleMouseMove, handleResize])
 
   const buildGraphFromNotes = useCallback((notes: Note[]) => {
-    console.log('=== buildGraphFromNotes called ===')
-    console.log('Notes received:', notes.length, notes.map(n => n.title))
-
     if (!sceneRef.current) return
 
     // Clear existing graph with proper disposal
@@ -297,14 +294,7 @@ export default function GraphView() {
 
     // Build links based on shared keywords ONLY (not mood)
     const links: { source: string; target: string; value: number; sharedKeywords: string[] }[] = []
-    const MIN_SHARED_KEYWORDS = 3 // VERY STRICT: Require at least 3 shared keywords to connect
-
-    // DEBUG: Log all note keywords to console
-    console.log('=== GRAPH DEBUG ===')
-    notes.forEach(note => {
-      const analysis = noteAnalysis.get(note.id)!
-      console.log(`Note "${note.title}":`, analysis.keywords.slice(0, 10))
-    })
+    const MIN_SHARED_KEYWORDS = 3 // Require at least 3 shared keywords to connect
 
     for (let i = 0; i < notes.length; i++) {
       for (let j = i + 1; j < notes.length; j++) {
@@ -314,12 +304,7 @@ export default function GraphView() {
         // Get shared keywords - this is the ONLY criteria for connection
         const sharedKeywords = getSharedKeywords(analysis1.keywords, analysis2.keywords)
 
-        // DEBUG: Log any shared keywords found
-        if (sharedKeywords.length > 0) {
-          console.log(`Shared between "${notes[i].title}" & "${notes[j].title}":`, sharedKeywords)
-        }
-
-        // VERY STRICT: Only connect if they share at least 3 meaningful keywords
+        // Only connect if they share at least 3 meaningful keywords
         const shouldConnect = sharedKeywords.length >= MIN_SHARED_KEYWORDS
 
         // Connection strength based on how many keywords they share
