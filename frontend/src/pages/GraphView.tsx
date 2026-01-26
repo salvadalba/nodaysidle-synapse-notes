@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { supabase } from '../lib/supabase'
 import { useWorkspace } from '../contexts/WorkspaceContext'
 import type { Note } from '../lib/database.types'
-import { analyzeText, getSharedKeywords, calculateKeywordSimilarity, calculateMoodSimilarity } from '../utils/textAnalysis'
+import { analyzeText, getSharedKeywords } from '../utils/textAnalysis'
 
 interface GraphNode extends THREE.Mesh {
   userData: {
@@ -292,37 +292,23 @@ export default function GraphView() {
       noteAnalysis.set(note.id, analyzeText(text))
     })
 
-    // Build links based on content similarity (shared keywords & mood)
+    // Build links based on shared keywords ONLY (not mood)
     const links: { source: string; target: string; value: number; sharedKeywords: string[] }[] = []
-    const MIN_SHARED_KEYWORDS = 2 // Require at least 2 shared keywords to connect
-    const MIN_CONNECTION_STRENGTH = 0.1 // Minimum strength threshold
+    const MIN_SHARED_KEYWORDS = 2 // STRICT: Require at least 2 shared keywords to connect
 
     for (let i = 0; i < notes.length; i++) {
       for (let j = i + 1; j < notes.length; j++) {
         const analysis1 = noteAnalysis.get(notes[i].id)!
         const analysis2 = noteAnalysis.get(notes[j].id)!
 
-        // Get shared keywords
+        // Get shared keywords - this is the ONLY criteria for connection
         const sharedKeywords = getSharedKeywords(analysis1.keywords, analysis2.keywords)
 
-        // Calculate similarity scores
-        const keywordSim = calculateKeywordSimilarity(analysis1.keywords, analysis2.keywords)
-        const moodSim = calculateMoodSimilarity(analysis1.moodScore, analysis2.moodScore)
+        // STRICT: Only connect if they share at least 2 meaningful keywords
+        const shouldConnect = sharedKeywords.length >= MIN_SHARED_KEYWORDS
 
-        // Check if moods are in the same category (same mood = strong connection)
-        const sameMood = analysis1.mood === analysis2.mood
-
-        // Calculate connection strength (weighted: keywords 60%, mood similarity 25%, same mood bonus 15%)
-        let connectionStrength = keywordSim * 0.6 + moodSim * 0.25
-        if (sameMood) {
-          connectionStrength += 0.15
-        }
-
-        // Connect if they share 2+ keywords OR have strong mood similarity
-        const shouldConnect =
-          sharedKeywords.length >= MIN_SHARED_KEYWORDS ||
-          (sameMood && sharedKeywords.length >= 1) ||
-          connectionStrength >= MIN_CONNECTION_STRENGTH
+        // Connection strength based on how many keywords they share
+        const connectionStrength = Math.min(1, sharedKeywords.length / 5) // 5+ shared = max strength
 
         if (shouldConnect && connectionStrength > 0) {
           links.push({
