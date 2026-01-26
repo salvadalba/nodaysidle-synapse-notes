@@ -266,6 +266,9 @@ export default function GraphView() {
   }, [animate, handleClick, handleMouseMove, handleResize])
 
   const buildGraphFromNotes = useCallback((notes: Note[]) => {
+    console.log('=== buildGraphFromNotes called ===')
+    console.log('Notes received:', notes.length, notes.map(n => n.title))
+
     if (!sceneRef.current) return
 
     // Clear existing graph with proper disposal
